@@ -1,0 +1,1108 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>실행자들 실행실적</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+:root {
+  --bg-page:   #F5F5F0;
+  --bg-card:   #FFFFFF;
+  --bg-muted:  #F1EFE8;
+  --border:    rgba(0,0,0,0.10);
+  --text-main: #1A1A18;
+  --text-sub:  #6B6B67;
+  --text-hint: #9A9A96;
+  --accent:    #378ADD;
+  --success:   #639922;
+  --danger:    #E24B4A;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg-page);color:var(--text-main);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:480px;margin:0 auto;min-height:100vh;position:relative;}
+#app{display:flex;flex-direction:column;height:100vh;}
+
+/* Header */
+#header{height:52px;background:var(--bg-card);border-bottom:0.5px solid var(--border);display:flex;align-items:center;padding:0 16px;flex-shrink:0;position:relative;z-index:10;}
+#header h1{font-size:17px;font-weight:700;color:var(--text-main);}
+#header-back{display:none;background:none;border:none;cursor:pointer;font-size:18px;margin-right:8px;color:var(--text-main);}
+
+/* Content */
+#content{flex:1;overflow-y:auto;padding-bottom:8px;}
+
+/* Tab bar */
+#tabbar{height:56px;background:var(--bg-card);border-top:0.5px solid var(--border);display:flex;flex-shrink:0;}
+.tab-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;background:none;border:none;cursor:pointer;font-size:10px;color:var(--text-hint);padding:4px 0;}
+.tab-btn.active{color:var(--accent);}
+.tab-btn .tab-icon{font-size:20px;line-height:1;}
+
+/* Cards */
+.card{background:var(--bg-card);border-radius:12px;border:0.5px solid var(--border);}
+
+/* Buttons */
+.btn{border-radius:8px;padding:10px 16px;font-size:14px;font-weight:600;cursor:pointer;border:none;transition:opacity .15s;}
+.btn:active{opacity:.75;}
+.btn-primary{background:var(--accent);color:#fff;}
+.btn-danger{background:var(--danger);color:#fff;}
+.btn-muted{background:var(--bg-muted);color:var(--text-main);}
+.btn-sm{padding:6px 12px;font-size:13px;}
+.fab{position:fixed;bottom:72px;right:calc(50% - 232px);width:48px;height:48px;border-radius:50%;background:var(--accent);color:#fff;border:none;font-size:24px;cursor:pointer;box-shadow:0 4px 12px rgba(55,138,221,.4);display:flex;align-items:center;justify-content:center;z-index:20;}
+@media(max-width:480px){.fab{right:16px;}}
+
+/* Input */
+input,select,textarea{border-radius:8px;border:0.5px solid var(--border);padding:8px 12px;font-size:14px;width:100%;background:var(--bg-card);color:var(--text-main);outline:none;}
+input:focus,select:focus,textarea:focus{border-color:var(--accent);}
+label{font-size:13px;color:var(--text-sub);margin-bottom:4px;display:block;}
+.form-group{margin-bottom:14px;}
+
+/* Modal */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:100;padding:16px;}
+.modal-card{background:var(--bg-card);border-radius:16px;width:100%;max-width:400px;padding:20px;}
+.modal-title{font-size:16px;font-weight:700;margin-bottom:16px;}
+.modal-actions{display:flex;gap:8px;margin-top:16px;}
+.modal-actions .btn{flex:1;}
+
+/* Avatar */
+.avatar{border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0;}
+.avatar-sm{width:36px;height:36px;font-size:14px;}
+.avatar-md{width:48px;height:48px;font-size:18px;}
+.avatar-lg{width:72px;height:72px;font-size:28px;}
+
+/* Level badges */
+.badge{border-radius:20px;padding:2px 8px;font-size:11px;font-weight:600;white-space:nowrap;}
+.badge-레전드{background:#FAEEDA;color:#633806;}
+.badge-다이아{background:#E6F1FB;color:#0C447C;}
+.badge-골드{background:#FAEEDA;color:#854F0B;}
+.badge-실버{background:#F1EFE8;color:#444441;}
+.badge-브론즈{background:#FAECE7;color:#712B13;}
+
+/* Avatar color pool */
+.av0{background:#EEEDFE;color:#3C3489;}
+.av1{background:#E1F5EE;color:#085041;}
+.av2{background:#FAECE7;color:#712B13;}
+.av3{background:#E6F1FB;color:#0C447C;}
+.av4{background:#FAEEDA;color:#633806;}
+
+/* Empty state */
+.empty-state{text-align:center;padding:60px 24px;color:var(--text-hint);font-size:14px;line-height:1.6;}
+
+/* Section padding */
+.section{padding:12px 16px;}
+
+/* ── Ranking tab ── */
+.summary-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding:12px 16px;}
+.summary-box{background:var(--bg-card);border-radius:12px;border:0.5px solid var(--border);padding:12px;text-align:center;}
+.summary-box .val{font-size:22px;font-weight:700;color:var(--text-main);}
+.summary-box .lbl{font-size:11px;color:var(--text-sub);margin-top:2px;}
+.rank-card{display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--bg-card);border-radius:12px;border:0.5px solid var(--border);margin:0 16px 8px;}
+.rank-card.first{border:1.5px solid var(--accent);}
+.rank-no{font-size:16px;font-weight:700;width:24px;text-align:center;color:var(--text-sub);flex-shrink:0;}
+.rank-info{flex:1;min-width:0;}
+.rank-name{font-size:15px;font-weight:600;}
+.rank-sub{font-size:12px;color:var(--text-sub);margin-top:1px;}
+.rank-right{display:flex;flex-direction:column;align-items:flex-end;gap:4px;}
+.rank-score{font-size:17px;font-weight:700;color:var(--text-main);}
+.rank-delta{font-size:11px;}
+.delta-up{color:var(--success);}
+.delta-down{color:var(--danger);}
+.delta-same{color:var(--text-hint);}
+
+/* ── Member tab ── */
+.member-card{display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--bg-card);border-radius:12px;border:0.5px solid var(--border);margin:0 16px 8px;cursor:pointer;}
+.member-info{flex:1;min-width:0;}
+.member-name{font-size:15px;font-weight:600;}
+.member-intro{font-size:12px;color:var(--text-sub);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.member-right{display:flex;flex-direction:column;align-items:flex-end;gap:4px;}
+
+/* Member detail */
+#member-detail{display:none;flex-direction:column;height:100%;}
+.detail-header{padding:24px 16px 16px;display:flex;flex-direction:column;align-items:center;gap:8px;background:var(--bg-card);border-bottom:0.5px solid var(--border);}
+.detail-name{font-size:20px;font-weight:700;}
+.detail-intro{font-size:13px;color:var(--text-sub);}
+.stat-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding:12px 16px;}
+.stat-box{background:var(--bg-card);border-radius:12px;border:0.5px solid var(--border);padding:10px;text-align:center;}
+.stat-box .val{font-size:18px;font-weight:700;}
+.stat-box .lbl{font-size:10px;color:var(--text-sub);margin-top:2px;}
+.attend-dots{display:flex;flex-wrap:wrap;gap:6px;padding:12px 16px;}
+.dot{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;}
+.dot-O{background:#EAF3DE;color:#27500A;}
+.dot-X{background:#FAECE7;color:#712B13;}
+.mission-bar-item{margin-bottom:10px;}
+.mission-bar-label{display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;}
+.mission-bar-track{background:var(--bg-muted);border-radius:4px;height:8px;overflow:hidden;}
+.mission-bar-fill{height:100%;border-radius:4px;background:var(--accent);}
+
+/* ── Attendance tab ── */
+.attend-summary{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;padding:10px 16px;}
+.attend-summary-box{background:var(--bg-card);border-radius:10px;border:0.5px solid var(--border);padding:8px;text-align:center;}
+.attend-summary-box .val{font-size:16px;font-weight:700;}
+.attend-summary-box .lbl{font-size:10px;color:var(--text-sub);}
+.attend-item{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:0.5px solid var(--border);}
+.attend-item:last-child{border-bottom:none;}
+.attend-score{font-size:12px;color:var(--success);font-weight:600;margin-left:auto;}
+.check-icon{color:var(--success);font-size:16px;}
+.absent-box{margin:0 16px 12px;background:var(--bg-muted);border-radius:10px;padding:10px 14px;font-size:13px;color:var(--text-sub);}
+.toggle-O{background:#EAF3DE;color:#27500A;border:none;border-radius:50%;width:36px;height:36px;font-size:14px;font-weight:700;cursor:pointer;flex-shrink:0;}
+.toggle-X{background:#FAECE7;color:#712B13;border:none;border-radius:50%;width:36px;height:36px;font-size:14px;font-weight:700;cursor:pointer;flex-shrink:0;}
+.edit-attend-item{display:flex;align-items:center;gap:10px;padding:8px 16px;border-bottom:0.5px solid var(--border);}
+.edit-attend-item:last-child{border-bottom:none;}
+
+/* ── Mission tab ── */
+.cat-tabs{display:flex;gap:6px;padding:10px 16px;overflow-x:auto;scrollbar-width:none;}
+.cat-tabs::-webkit-scrollbar{display:none;}
+.cat-tab{padding:5px 12px;border-radius:20px;font-size:13px;font-weight:600;cursor:pointer;border:0.5px solid var(--border);background:var(--bg-card);color:var(--text-sub);white-space:nowrap;}
+.cat-tab.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+.cross-table-wrap{overflow-x:auto;padding:0 16px 12px;}
+.cross-table{border-collapse:collapse;font-size:12px;min-width:100%;}
+.cross-table th{background:var(--bg-muted);padding:6px 8px;border:0.5px solid var(--border);white-space:nowrap;font-weight:600;text-align:center;}
+.cross-table td{border:0.5px solid var(--border);padding:0;text-align:center;}
+.cross-table td.mission-cell-full{background:#EAF3DE;}
+.cross-table td.mission-cell-partial{background:#FAEEDA;}
+.cross-table td.mission-cell-empty{background:var(--bg-muted);color:var(--text-hint);}
+.score-input{width:48px;border:none;background:transparent;text-align:center;font-size:12px;font-weight:600;padding:6px 4px;cursor:pointer;}
+.score-input:focus{outline:2px solid var(--accent);border-radius:4px;}
+.cross-table .mission-label-cell{text-align:left;padding:6px 8px;font-weight:600;background:var(--bg-card);white-space:nowrap;}
+.cross-table .mission-max{color:var(--text-hint);font-weight:400;}
+.cross-table .sum-row td{background:var(--bg-muted);font-weight:700;padding:6px 8px;}
+
+/* ── Settings tab ── */
+.settings-section{padding:16px;}
+.settings-section h2{font-size:14px;font-weight:700;color:var(--text-sub);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px;}
+.settings-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:0.5px solid var(--border);}
+.settings-row:last-child{border-bottom:none;}
+.settings-label{font-size:14px;}
+.settings-val-input{width:80px;text-align:right;}
+.level-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+.level-row label{min-width:50px;font-size:13px;}
+.level-row input{flex:1;}
+
+/* Divider */
+.divider{height:0.5px;background:var(--border);margin:0 16px;}
+.section-title{padding:12px 16px 6px;font-size:13px;font-weight:700;color:var(--text-sub);}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="header">
+    <button id="header-back" onclick="closeDetail()">←</button>
+    <h1 id="header-title">실행자들</h1>
+  </div>
+  <div id="content"></div>
+  <div id="tabbar">
+    <button class="tab-btn active" onclick="switchTab('ranking')" id="tab-ranking">
+      <span class="tab-icon">🏆</span>랭킹
+    </button>
+    <button class="tab-btn" onclick="switchTab('members')" id="tab-members">
+      <span class="tab-icon">👥</span>회원
+    </button>
+    <button class="tab-btn" onclick="switchTab('attendance')" id="tab-attendance">
+      <span class="tab-icon">📋</span>출석
+    </button>
+    <button class="tab-btn" onclick="switchTab('missions')" id="tab-missions">
+      <span class="tab-icon">🎯</span>미션
+    </button>
+    <button class="tab-btn" onclick="switchTab('settings')" id="tab-settings">
+      <span class="tab-icon">⚙️</span>설정
+    </button>
+  </div>
+</div>
+
+<script>
+// ─── Storage helpers ───────────────────────────────────────────
+const KEY = { members:'members', sessions:'sessions', attendance:'attendance', missions:'missions', missionScores:'missionScores', settings:'settings' };
+
+function load(key){ try{ return JSON.parse(localStorage.getItem(key)); }catch{ return null; } }
+function save(key,val){ localStorage.setItem(key,JSON.stringify(val)); }
+
+function initStorage(){
+  if(!load(KEY.members))     save(KEY.members,[]);
+  if(!load(KEY.sessions))    save(KEY.sessions,[]);
+  if(!load(KEY.attendance))  save(KEY.attendance,{});
+  if(!load(KEY.missions))    save(KEY.missions,[]);
+  if(!load(KEY.missionScores)) save(KEY.missionScores,{});
+  if(!load(KEY.settings))    save(KEY.settings,{
+    levels:[
+      {name:'레전드',minScore:500},
+      {name:'다이아',minScore:350},
+      {name:'골드',minScore:200},
+      {name:'실버',minScore:100},
+      {name:'브론즈',minScore:0}
+    ],
+    attendScore:10
+  });
+}
+
+// ─── Utility ──────────────────────────────────────────────────
+function uuid(){ return crypto.randomUUID(); }
+function getInitial(name){ return name ? name.charAt(0) : '?'; }
+function avClass(idx){ return 'av'+(idx%5); }
+
+function getLevel(score){
+  const s = load(KEY.settings);
+  const levels = [...s.levels].sort((a,b)=>b.minScore-a.minScore);
+  for(const lv of levels){ if(score >= lv.minScore) return lv.name; }
+  return '브론즈';
+}
+
+function calcScore(memberId){
+  const s = load(KEY.settings);
+  const attendance = load(KEY.attendance)||{};
+  const missionScores = load(KEY.missionScores)||{};
+  const sessions = load(KEY.sessions)||[];
+  let attend = 0;
+  for(const sess of sessions){
+    if(attendance[memberId+'__'+sess.id]==='O') attend += s.attendScore;
+  }
+  let mission = 0;
+  const missions = load(KEY.missions)||[];
+  for(const m of missions){
+    const v = missionScores[memberId+'__'+m.id];
+    if(v) mission += Number(v);
+  }
+  return {attend, mission, total: attend+mission};
+}
+
+function calcAllRankings(){
+  const members = load(KEY.members)||[];
+  return members.map((m,i)=>{
+    const sc = calcScore(m.id);
+    return {member:m, idx:i, ...sc, level: getLevel(sc.total)};
+  }).sort((a,b)=>b.total-a.total);
+}
+
+function calcPrevRankings(){
+  // Prev = without the latest session
+  const sessions = load(KEY.sessions)||[];
+  if(sessions.length===0) return null;
+  const sorted = [...sessions].sort((a,b)=>b.no-a.no);
+  const latest = sorted[0];
+  const members = load(KEY.members)||[];
+  const attendance = load(KEY.attendance)||{};
+  const missionScores = load(KEY.missionScores)||{};
+  const s = load(KEY.settings);
+  return members.map((m,i)=>{
+    let attend=0;
+    for(const sess of sessions){
+      if(sess.id===latest.id) continue;
+      if(attendance[m.id+'__'+sess.id]==='O') attend += s.attendScore;
+    }
+    let mission=0;
+    const missions = load(KEY.missions)||[];
+    for(const ms of missions){
+      const v=missionScores[m.id+'__'+ms.id];
+      if(v) mission+=Number(v);
+    }
+    const total=attend+mission;
+    return {member:m, idx:i, total};
+  }).sort((a,b)=>b.total-a.total);
+}
+
+// ─── Tab state ────────────────────────────────────────────────
+let currentTab = 'ranking';
+let detailMemberId = null;
+let attendEditMode = false;
+let currentSessionId = null;
+let missionCategory = '전체';
+
+function switchTab(tab){
+  if(detailMemberId){ closeDetail(); }
+  currentTab = tab;
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+tab).classList.add('active');
+  document.getElementById('header-back').style.display='none';
+  document.getElementById('header-title').textContent='실행자들';
+  renderContent();
+}
+
+function renderContent(){
+  const c = document.getElementById('content');
+  // Remove any FAB
+  document.querySelectorAll('.fab').forEach(f=>f.remove());
+  if(currentTab==='ranking')    renderRanking(c);
+  else if(currentTab==='members') renderMembers(c);
+  else if(currentTab==='attendance') renderAttendance(c);
+  else if(currentTab==='missions') renderMissions(c);
+  else if(currentTab==='settings') renderSettings(c);
+}
+
+// ─── Ranking ──────────────────────────────────────────────────
+function renderRanking(c){
+  const members = load(KEY.members)||[];
+  const sessions = load(KEY.sessions)||[];
+  const missions = load(KEY.missions)||[];
+  c.innerHTML='';
+
+  const summary = document.createElement('div');
+  summary.className='summary-row';
+  summary.innerHTML=`
+    <div class="summary-box"><div class="val">${members.length}</div><div class="lbl">전체 회원</div></div>
+    <div class="summary-box"><div class="val">${sessions.length}</div><div class="lbl">진행 회차</div></div>
+    <div class="summary-box"><div class="val">${missions.length}</div><div class="lbl">등록 미션</div></div>
+  `;
+  c.appendChild(summary);
+
+  if(members.length===0){
+    const e=document.createElement('div');
+    e.className='empty-state';
+    e.textContent='회원을 먼저 추가해 주세요';
+    c.appendChild(e);
+    return;
+  }
+
+  const rankings = calcAllRankings();
+  const prevRankings = sessions.length>0 ? calcPrevRankings() : null;
+
+  rankings.forEach((r,rank)=>{
+    let delta='—';
+    let deltaClass='delta-same';
+    if(prevRankings){
+      const prevIdx = prevRankings.findIndex(p=>p.member.id===r.member.id);
+      const prevRank = prevIdx+1;
+      const diff = prevRank - (rank+1);
+      if(diff>0){ delta='▲'+diff; deltaClass='delta-up'; }
+      else if(diff<0){ delta='▼'+Math.abs(diff); deltaClass='delta-down'; }
+    }
+    const card=document.createElement('div');
+    card.className='rank-card'+(rank===0?' first':'');
+    card.innerHTML=`
+      <div class="rank-no">${rank+1}</div>
+      <div class="avatar avatar-sm ${avClass(r.idx)}">${getInitial(r.member.name)}</div>
+      <div class="rank-info">
+        <div class="rank-name">${r.member.name}</div>
+        <div class="rank-sub">출석 ${r.attend}점 + 미션 ${r.mission}점</div>
+      </div>
+      <div class="rank-right">
+        <div class="rank-score">${r.total}점</div>
+        <div style="display:flex;align-items:center;gap:4px;">
+          <span class="badge badge-${r.level}">${r.level}</span>
+          <span class="rank-delta ${deltaClass}">${delta}</span>
+        </div>
+      </div>
+    `;
+    c.appendChild(card);
+  });
+}
+
+// ─── Members ──────────────────────────────────────────────────
+function renderMembers(c){
+  const members = load(KEY.members)||[];
+  c.innerHTML='';
+
+  if(members.length===0){
+    const e=document.createElement('div');
+    e.className='empty-state';
+    e.innerHTML='등록된 회원이 없습니다.<br>+ 추가 버튼을 눌러보세요';
+    c.appendChild(e);
+  } else {
+    const p=document.createElement('div');
+    p.style.paddingTop='8px';
+    members.forEach((m,i)=>{
+      const sc=calcScore(m.id);
+      const card=document.createElement('div');
+      card.className='member-card';
+      card.innerHTML=`
+        <div class="avatar avatar-sm ${avClass(i)}">${getInitial(m.name)}</div>
+        <div class="member-info">
+          <div class="member-name">${m.name}</div>
+          <div class="member-intro">${m.intro||'한줄소개 없음'}</div>
+        </div>
+        <div class="member-right">
+          <div style="font-size:15px;font-weight:700;">${sc.total}점</div>
+          <span class="badge badge-${getLevel(sc.total)}">${getLevel(sc.total)}</span>
+        </div>
+      `;
+      card.onclick=()=>openDetail(m.id);
+      p.appendChild(card);
+    });
+    c.appendChild(p);
+  }
+
+  // FAB
+  const fab=document.createElement('button');
+  fab.className='fab';
+  fab.innerHTML='+';
+  fab.onclick=()=>openMemberModal(null);
+  document.getElementById('app').appendChild(fab);
+}
+
+// Member detail
+function openDetail(memberId){
+  detailMemberId=memberId;
+  document.getElementById('header-back').style.display='flex';
+  document.getElementById('header-title').textContent='회원 상세';
+  renderMemberDetail();
+}
+
+function closeDetail(){
+  detailMemberId=null;
+  document.getElementById('header-back').style.display='none';
+  document.getElementById('header-title').textContent='실행자들';
+  renderContent();
+}
+
+function renderMemberDetail(){
+  const members=load(KEY.members)||[];
+  const sessions=load(KEY.sessions)||[];
+  const missions=load(KEY.missions)||[];
+  const attendance=load(KEY.attendance)||{};
+  const missionScores=load(KEY.missionScores)||{};
+  const c=document.getElementById('content');
+  c.innerHTML='';
+
+  const m=members.find(x=>x.id===detailMemberId);
+  if(!m) return;
+  const idx=members.indexOf(m);
+  const sc=calcScore(m.id);
+  const level=getLevel(sc.total);
+  const rankings=calcAllRankings();
+  const rank=rankings.findIndex(r=>r.member.id===m.id)+1;
+
+  const attendO=sessions.filter(s=>attendance[m.id+'__'+s.id]==='O').length;
+  const attendRate=sessions.length>0?Math.round(attendO/sessions.length*100):0;
+  const missionDone=missions.filter(ms=>missionScores[m.id+'__'+ms.id]>0).length;
+
+  c.innerHTML=`
+    <div class="detail-header">
+      <div class="avatar avatar-lg ${avClass(idx)}">${getInitial(m.name)}</div>
+      <div class="detail-name">${m.name}</div>
+      ${m.intro?`<div class="detail-intro">${m.intro}</div>`:''}
+      <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
+        <span class="badge badge-${level}">${level}</span>
+        <span style="font-size:14px;font-weight:700;">${sc.total}점</span>
+        <span style="font-size:13px;color:var(--text-sub);">· ${rank}위</span>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px;">
+        <button class="btn btn-muted btn-sm" onclick="openMemberModal('${m.id}')">편집</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteMember('${m.id}')">삭제</button>
+      </div>
+    </div>
+    <div class="stat-row">
+      <div class="stat-box"><div class="val">${attendO}/${sessions.length}</div><div class="lbl">출석 횟수</div></div>
+      <div class="stat-box"><div class="val">${attendRate}%</div><div class="lbl">출석률</div></div>
+      <div class="stat-box"><div class="val">${missionDone}/${missions.length}</div><div class="lbl">미션 완료</div></div>
+    </div>
+    <div class="section-title">출석 이력</div>
+    <div class="attend-dots" id="detail-dots"></div>
+    <div class="section-title" style="margin-top:4px;">미션 실적</div>
+    <div style="padding:0 16px 16px;" id="detail-missions"></div>
+  `;
+
+  // Dots
+  const dotsEl=document.getElementById('detail-dots');
+  const sortedSessions=[...sessions].sort((a,b)=>a.no-b.no);
+  if(sortedSessions.length===0){
+    dotsEl.innerHTML='<span style="font-size:12px;color:var(--text-hint);">출석 기록 없음</span>';
+  } else {
+    sortedSessions.forEach(s=>{
+      const v=attendance[m.id+'__'+s.id]||'X';
+      const d=document.createElement('div');
+      d.className='dot dot-'+v;
+      d.title=s.no+'회차 '+s.date;
+      d.textContent=v;
+      dotsEl.appendChild(d);
+    });
+  }
+
+  // Mission bars
+  const msEl=document.getElementById('detail-missions');
+  if(missions.length===0){
+    msEl.innerHTML='<span style="font-size:12px;color:var(--text-hint);">미션 없음</span>';
+  } else {
+    missions.forEach(ms=>{
+      const got=Number(missionScores[m.id+'__'+ms.id]||0);
+      const pct=ms.maxScore>0?Math.round(got/ms.maxScore*100):0;
+      const div=document.createElement('div');
+      div.className='mission-bar-item';
+      div.innerHTML=`
+        <div class="mission-bar-label">
+          <span>${ms.name}</span>
+          <span>${got}/${ms.maxScore}점</span>
+        </div>
+        <div class="mission-bar-track">
+          <div class="mission-bar-fill" style="width:${pct}%;"></div>
+        </div>
+      `;
+      msEl.appendChild(div);
+    });
+  }
+}
+
+// Member modal
+function openMemberModal(memberId){
+  const members=load(KEY.members)||[];
+  const m=memberId?members.find(x=>x.id===memberId):null;
+  const overlay=document.createElement('div');
+  overlay.className='modal-overlay';
+  overlay.id='member-modal';
+  overlay.innerHTML=`
+    <div class="modal-card">
+      <div class="modal-title">${m?'회원 편집':'회원 추가'}</div>
+      <div class="form-group"><label>이름 *</label><input id="m-name" value="${m?m.name:''}" placeholder="이름 입력"></div>
+      <div class="form-group"><label>한줄소개</label><input id="m-intro" value="${m?m.intro||'':''}" placeholder="한줄소개 (선택)"></div>
+      <div class="modal-actions">
+        <button class="btn btn-muted" onclick="closeModal('member-modal')">취소</button>
+        <button class="btn btn-primary" onclick="saveMember('${memberId||''}')">저장</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  document.getElementById('m-name').focus();
+}
+
+function saveMember(memberId){
+  const name=document.getElementById('m-name').value.trim();
+  if(!name){ alert('이름을 입력해 주세요.'); return; }
+  const members=load(KEY.members)||[];
+  if(memberId){
+    const m=members.find(x=>x.id===memberId);
+    if(m){ m.name=name; m.intro=document.getElementById('m-intro').value.trim(); }
+  } else {
+    members.push({id:uuid(),name,intro:document.getElementById('m-intro').value.trim()});
+  }
+  save(KEY.members,members);
+  closeModal('member-modal');
+  if(detailMemberId) renderMemberDetail();
+  else renderContent();
+}
+
+function deleteMember(memberId){
+  if(!confirm('회원을 삭제할까요?\n관련 출석·미션 기록도 함께 삭제됩니다.')) return;
+  let members=load(KEY.members)||[];
+  members=members.filter(m=>m.id!==memberId);
+  save(KEY.members,members);
+  // Clean attendance
+  const att=load(KEY.attendance)||{};
+  Object.keys(att).forEach(k=>{ if(k.startsWith(memberId+'__')) delete att[k]; });
+  save(KEY.attendance,att);
+  // Clean missionScores
+  const ms=load(KEY.missionScores)||{};
+  Object.keys(ms).forEach(k=>{ if(k.startsWith(memberId+'__')) delete ms[k]; });
+  save(KEY.missionScores,ms);
+  closeDetail();
+}
+
+// ─── Attendance ───────────────────────────────────────────────
+function renderAttendance(c){
+  const sessions=load(KEY.sessions)||[];
+  c.innerHTML='';
+  attendEditMode=false;
+
+  if(sessions.length===0){
+    const e=document.createElement('div');
+    e.className='empty-state';
+    e.textContent='회차가 없습니다. 새 회차를 추가해 주세요';
+    c.appendChild(e);
+    addSessionFab();
+    return;
+  }
+
+  const sorted=[...sessions].sort((a,b)=>b.no-a.no);
+  if(!currentSessionId || !sessions.find(s=>s.id===currentSessionId)){
+    currentSessionId=sorted[0].id;
+  }
+
+  // Dropdown + 편집 버튼
+  const sel=document.createElement('div');
+  sel.style.cssText='padding:10px 16px;display:flex;gap:8px;align-items:center;';
+  sel.innerHTML=`<select id="session-select" onchange="onSessionChange(this.value)" style="flex:1;"></select><button class="btn btn-muted btn-sm" onclick="openSessionModal(currentSessionId)">편집</button>`;
+  c.appendChild(sel);
+  const selectEl=document.getElementById('session-select');
+  sorted.forEach(s=>{
+    const opt=document.createElement('option');
+    opt.value=s.id;
+    opt.textContent=s.no+'회차 — '+s.date+' '+s.title;
+    if(s.id===currentSessionId) opt.selected=true;
+    selectEl.appendChild(opt);
+  });
+
+  renderAttendBody(c);
+  addSessionFab();
+}
+
+function renderAttendBody(c){
+  // Remove old body
+  document.getElementById('attend-body')?.remove();
+  const members=load(KEY.members)||[];
+  const attendance=load(KEY.attendance)||{};
+  const s=load(KEY.settings);
+  const body=document.createElement('div');
+  body.id='attend-body';
+
+  const present=members.filter(m=>attendance[m.id+'__'+currentSessionId]==='O');
+  const absent=members.filter(m=>attendance[m.id+'__'+currentSessionId]!=='O');
+  const rate=members.length>0?Math.round(present.length/members.length*100):0;
+
+  // Summary
+  const sum=document.createElement('div');
+  sum.className='attend-summary';
+  sum.innerHTML=`
+    <div class="attend-summary-box"><div class="val">${present.length}</div><div class="lbl">참석</div></div>
+    <div class="attend-summary-box"><div class="val">${absent.length}</div><div class="lbl">불참</div></div>
+    <div class="attend-summary-box"><div class="val">${rate}%</div><div class="lbl">출석률</div></div>
+    <div class="attend-summary-box"><div class="val">+${s.attendScore}</div><div class="lbl">참석점수</div></div>
+  `;
+  body.appendChild(sum);
+
+  if(!attendEditMode){
+    // Action row
+    const actRow=document.createElement('div');
+    actRow.style.cssText='display:flex;gap:8px;padding:0 16px 10px;';
+    actRow.innerHTML=`<button class="btn btn-muted btn-sm" onclick="toggleEditMode()">출석 편집</button>`;
+    body.appendChild(actRow);
+
+    if(members.length===0){
+      const e=document.createElement('div');
+      e.className='empty-state';
+      e.textContent='등록된 회원이 없습니다.';
+      body.appendChild(e);
+    } else {
+      // Present list
+      const presentSorted=[...present].sort((a,b)=>a.name.localeCompare(b.name,'ko'));
+      const listCard=document.createElement('div');
+      listCard.style.cssText='background:var(--bg-card);border-radius:12px;border:0.5px solid var(--border);margin:0 16px 10px;overflow:hidden;';
+      if(presentSorted.length===0){
+        listCard.innerHTML='<div style="padding:14px 16px;font-size:13px;color:var(--text-hint);">참석자 없음</div>';
+      } else {
+        presentSorted.forEach((m,i)=>{
+          const row=document.createElement('div');
+          row.className='attend-item';
+          row.innerHTML=`
+            <div class="avatar avatar-sm ${avClass(load(KEY.members).indexOf(m))}">${getInitial(m.name)}</div>
+            <div style="font-size:14px;font-weight:500;">${m.name}</div>
+            <div class="attend-score">+${s.attendScore}점</div>
+            <div class="check-icon">✓</div>
+          `;
+          listCard.appendChild(row);
+        });
+      }
+      body.appendChild(listCard);
+
+      // Absent summary
+      if(absent.length>0){
+        const absentBox=document.createElement('div');
+        absentBox.className='absent-box';
+        absentBox.innerHTML=`<span style="font-weight:600;color:var(--text-main);">불참자</span> ${absent.map(m=>m.name).join(', ')} <span style="color:var(--text-hint);">(${absent.length}명)</span>`;
+        body.appendChild(absentBox);
+      }
+    }
+  } else {
+    // Edit mode
+    const actRow=document.createElement('div');
+    actRow.style.cssText='display:flex;gap:8px;padding:0 16px 10px;';
+    actRow.innerHTML=`<button class="btn btn-primary btn-sm" onclick="saveAttendEdit()">편집 완료</button><button class="btn btn-muted btn-sm" onclick="cancelAttendEdit()">취소</button>`;
+    body.appendChild(actRow);
+
+    const listCard=document.createElement('div');
+    listCard.style.cssText='background:var(--bg-card);border-radius:12px;border:0.5px solid var(--border);margin:0 16px 10px;overflow:hidden;';
+    const membersSorted=[...members].sort((a,b)=>a.name.localeCompare(b.name,'ko'));
+    membersSorted.forEach(m=>{
+      const val=attendance[m.id+'__'+currentSessionId]||'X';
+      const row=document.createElement('div');
+      row.className='edit-attend-item';
+      row.innerHTML=`
+        <div class="avatar avatar-sm ${avClass(load(KEY.members).indexOf(m))}">${getInitial(m.name)}</div>
+        <div style="font-size:14px;font-weight:500;flex:1;">${m.name}</div>
+        <button class="toggle-${val}" id="att-${m.id}" onclick="toggleAtt('${m.id}',this)">${val}</button>
+      `;
+      listCard.appendChild(row);
+    });
+    body.appendChild(listCard);
+  }
+
+  c.appendChild(body);
+}
+
+function onSessionChange(id){
+  currentSessionId=id;
+  const c=document.getElementById('content');
+  attendEditMode=false;
+  renderAttendBody(c);
+}
+
+function toggleEditMode(){
+  attendEditMode=true;
+  renderAttendBody(document.getElementById('content'));
+}
+
+function cancelAttendEdit(){
+  attendEditMode=false;
+  renderAttendBody(document.getElementById('content'));
+}
+
+function toggleAtt(memberId, btn){
+  const cur=btn.textContent;
+  const next=cur==='O'?'X':'O';
+  btn.textContent=next;
+  btn.className='toggle-'+next;
+}
+
+function saveAttendEdit(){
+  const members=load(KEY.members)||[];
+  const att=load(KEY.attendance)||{};
+  members.forEach(m=>{
+    const btn=document.getElementById('att-'+m.id);
+    if(btn){ att[m.id+'__'+currentSessionId]=btn.textContent; }
+  });
+  save(KEY.attendance,att);
+  attendEditMode=false;
+  renderAttendBody(document.getElementById('content'));
+}
+
+function addSessionFab(){
+  const fab=document.createElement('button');
+  fab.className='fab';
+  fab.innerHTML='+';
+  fab.onclick=()=>openSessionModal();
+  document.getElementById('app').appendChild(fab);
+}
+
+function openSessionModal(sessionId){
+  const sessions=load(KEY.sessions)||[];
+  const editing=sessionId?sessions.find(s=>s.id===sessionId):null;
+  const nextNo=sessions.length>0?Math.max(...sessions.map(s=>s.no))+1:1;
+  const today=new Date().toISOString().slice(0,10);
+  const overlay=document.createElement('div');
+  overlay.className='modal-overlay';
+  overlay.id='session-modal';
+  overlay.innerHTML=`
+    <div class="modal-card">
+      <div class="modal-title">${editing?'회차 편집':'새 회차 추가'}</div>
+      <div class="form-group"><label>회차 번호</label><input id="s-no" type="number" value="${editing?editing.no:nextNo}"></div>
+      <div class="form-group"><label>날짜</label><input id="s-date" type="date" value="${editing?editing.date:today}"></div>
+      <div class="form-group"><label>제목</label><input id="s-title" placeholder="모임 제목 (선택)" value="${editing?editing.title:''}"></div>
+      <div class="modal-actions">
+        ${editing?`<button class="btn btn-danger" onclick="deleteSession('${sessionId}')">삭제</button>`:''}
+        <button class="btn btn-muted" onclick="closeModal('session-modal')">취소</button>
+        <button class="btn btn-primary" onclick="saveSession('${sessionId||''}')">${editing?'저장':'추가'}</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+}
+
+function saveSession(sessionId){
+  const no=parseInt(document.getElementById('s-no').value);
+  const date=document.getElementById('s-date').value;
+  const title=document.getElementById('s-title').value.trim();
+  if(!date){ alert('날짜를 입력해 주세요.'); return; }
+  const sessions=load(KEY.sessions)||[];
+  if(sessionId){
+    const s=sessions.find(s=>s.id===sessionId);
+    if(s){ s.no=no; s.date=date; s.title=title; }
+    save(KEY.sessions,sessions);
+  } else {
+    const sid=uuid();
+    sessions.push({id:sid,no,date,title});
+    save(KEY.sessions,sessions);
+    const members=load(KEY.members)||[];
+    const att=load(KEY.attendance)||{};
+    members.forEach(m=>{ att[m.id+'__'+sid]='X'; });
+    save(KEY.attendance,att);
+    currentSessionId=sid;
+  }
+  closeModal('session-modal');
+  renderContent();
+}
+
+function deleteSession(sessionId){
+  if(!confirm('이 회차를 삭제할까요?\n출석 기록도 함께 삭제됩니다.')) return;
+  let sessions=load(KEY.sessions)||[];
+  sessions=sessions.filter(s=>s.id!==sessionId);
+  save(KEY.sessions,sessions);
+  const att=load(KEY.attendance)||{};
+  Object.keys(att).forEach(k=>{ if(k.endsWith('__'+sessionId)) delete att[k]; });
+  save(KEY.attendance,att);
+  currentSessionId=sessions.length>0?[...sessions].sort((a,b)=>b.no-a.no)[0].id:null;
+  closeModal('session-modal');
+  renderContent();
+}
+
+// ─── Missions ─────────────────────────────────────────────────
+function renderMissions(c){
+  const missions=load(KEY.missions)||[];
+  const members=load(KEY.members)||[];
+  c.innerHTML='';
+
+  // Category tabs
+  const cats=['전체','독서','운동','실행','기타'];
+  const catBar=document.createElement('div');
+  catBar.className='cat-tabs';
+  cats.forEach(cat=>{
+    const btn=document.createElement('button');
+    btn.className='cat-tab'+(missionCategory===cat?' active':'');
+    btn.textContent=cat;
+    btn.onclick=()=>{ missionCategory=cat; renderMissions(c); };
+    catBar.appendChild(btn);
+  });
+  c.appendChild(catBar);
+
+  const filtered=missionCategory==='전체'?missions:missions.filter(m=>m.category===missionCategory);
+
+  if(missions.length===0){
+    const e=document.createElement('div');
+    e.className='empty-state';
+    e.innerHTML='등록된 미션이 없습니다.<br>+ 미션 버튼을 눌러보세요';
+    c.appendChild(e);
+  } else if(filtered.length===0){
+    const e=document.createElement('div');
+    e.className='empty-state';
+    e.textContent='해당 카테고리의 미션이 없습니다.';
+    c.appendChild(e);
+  } else {
+    renderCrossTable(c, filtered, members);
+  }
+
+  // FAB
+  const fab=document.createElement('button');
+  fab.className='fab';
+  fab.innerHTML='+';
+  fab.onclick=()=>openMissionModal();
+  document.getElementById('app').appendChild(fab);
+}
+
+function renderCrossTable(c, missions, members){
+  const missionScores=load(KEY.missionScores)||{};
+  const wrap=document.createElement('div');
+  wrap.className='cross-table-wrap';
+  const table=document.createElement('table');
+  table.className='cross-table';
+
+  // Header: 회원 = 행, 미션 = 열
+  const thead=document.createElement('thead');
+  let headRow='<tr><th>회원</th><th>합계</th>';
+  missions.forEach(ms=>{ headRow+=`<th>${ms.name}<br><span class="mission-max">최대 ${ms.maxScore}</span></th>`; });
+  headRow+='</tr>';
+  thead.innerHTML=headRow;
+  table.appendChild(thead);
+
+  // Body: 행 = 회원
+  const tbody=document.createElement('tbody');
+  const allMembers=load(KEY.members)||[];
+  members.forEach(m=>{
+    const idx=allMembers.indexOf(m);
+    const tr=document.createElement('tr');
+    // 이름 셀
+    const nameTd=document.createElement('td');
+    nameTd.className='mission-label-cell';
+    nameTd.innerHTML=`<div style="display:flex;align-items:center;gap:6px;"><div class="avatar avatar-sm ${avClass(idx)}" style="width:24px;height:24px;font-size:11px;flex-shrink:0;">${getInitial(m.name)}</div><span>${m.name}</span></div>`;
+    tr.appendChild(nameTd);
+
+    // 합계 셀 — 이름 바로 오른쪽
+    const sumCell=document.createElement('td');
+    sumCell.style.cssText='font-weight:700;padding:6px 8px;background:var(--bg-muted);';
+
+    let rowSum=0;
+    missions.forEach(ms=>{
+      const key=m.id+'__'+ms.id;
+      const val=Number(missionScores[key]||0);
+      rowSum+=val;
+      const td=document.createElement('td');
+      if(val===ms.maxScore && val>0){
+        td.className='mission-cell-full';
+      } else if(val>0){
+        td.className='mission-cell-partial';
+      } else {
+        td.className='mission-cell-empty';
+      }
+      const inp=document.createElement('input');
+      inp.type='number';
+      inp.className='score-input';
+      inp.min=0;
+      inp.max=ms.maxScore;
+      inp.value=val>0?val:'';
+      inp.placeholder='—';
+      inp.dataset.key=key;
+      inp.dataset.max=ms.maxScore;
+      inp.dataset.memberId=m.id;
+      inp.dataset.missionId=ms.id;
+      inp.onchange=function(){
+        let v=parseInt(this.value)||0;
+        if(v<0) v=0;
+        if(v>ms.maxScore){ v=ms.maxScore; this.value=v; }
+        const scores=load(KEY.missionScores)||{};
+        if(v>0) scores[this.dataset.key]=v;
+        else delete scores[this.dataset.key];
+        save(KEY.missionScores,scores);
+        if(v===ms.maxScore && v>0){
+          td.className='mission-cell-full';
+        } else if(v>0){
+          td.className='mission-cell-partial';
+        } else {
+          td.className='mission-cell-empty';
+          this.value='';
+        }
+        // 합계 셀 갱신
+        const allScores=load(KEY.missionScores)||{};
+        let newSum=0;
+        missions.forEach(ms2=>{ newSum+=Number(allScores[m.id+'__'+ms2.id]||0); });
+        sumCell.textContent=newSum;
+      };
+      td.appendChild(inp);
+      tr.appendChild(td);
+    });
+
+    // 합계 셀 값 세팅 후 이름 다음 위치에 삽입
+    sumCell.textContent=rowSum;
+    tr.insertBefore(sumCell, tr.children[1]);
+    tbody.appendChild(tr);
+  });
+
+  // 하단 합계 행: 미션별 전체 합
+  const sumTr=document.createElement('tr');
+  sumTr.className='sum-row';
+  sumTr.innerHTML='<td>합계</td><td></td>';
+  missions.forEach(ms=>{
+    let sum=0;
+    members.forEach(m=>{ sum+=Number(missionScores[m.id+'__'+ms.id]||0); });
+    sumTr.innerHTML+=`<td>${sum}</td>`;
+  });
+  sumTr.innerHTML+='<td></td>';
+  tbody.appendChild(sumTr);
+
+  table.appendChild(tbody);
+  wrap.appendChild(table);
+  c.appendChild(wrap);
+}
+
+function openMissionModal(){
+  const overlay=document.createElement('div');
+  overlay.className='modal-overlay';
+  overlay.id='mission-modal';
+  overlay.innerHTML=`
+    <div class="modal-card">
+      <div class="modal-title">미션 추가</div>
+      <div class="form-group"><label>미션명 *</label><input id="ms-name" placeholder="미션명"></div>
+      <div class="form-group"><label>최대점수 *</label><input id="ms-max" type="number" min="1" placeholder="30"></div>
+      <div class="form-group"><label>카테고리</label>
+        <select id="ms-cat">
+          <option>독서</option><option>운동</option><option>실행</option><option>기타</option>
+        </select>
+      </div>
+      <div class="form-group"><label>설명 (선택)</label><input id="ms-desc" placeholder="설명"></div>
+      <div class="modal-actions">
+        <button class="btn btn-muted" onclick="closeModal('mission-modal')">취소</button>
+        <button class="btn btn-primary" onclick="saveMission()">추가</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  document.getElementById('ms-name').focus();
+}
+
+function saveMission(){
+  const name=document.getElementById('ms-name').value.trim();
+  const maxScore=parseInt(document.getElementById('ms-max').value);
+  if(!name){ alert('미션명을 입력해 주세요.'); return; }
+  if(!maxScore||maxScore<=0){ alert('최대점수를 올바르게 입력해 주세요.'); return; }
+  const missions=load(KEY.missions)||[];
+  missions.push({
+    id:uuid(),
+    name,
+    maxScore,
+    category:document.getElementById('ms-cat').value,
+    desc:document.getElementById('ms-desc').value.trim()
+  });
+  save(KEY.missions,missions);
+  closeModal('mission-modal');
+  renderContent();
+}
+
+// ─── Settings ─────────────────────────────────────────────────
+function renderSettings(c){
+  const s=load(KEY.settings);
+  c.innerHTML='';
+
+  const html=`
+    <div class="settings-section">
+      <h2>출석 점수</h2>
+      <div class="settings-row">
+        <span class="settings-label">출석(O) 점수</span>
+        <input class="settings-val-input" type="number" id="set-attend" value="${s.attendScore}" min="0">
+      </div>
+      <div style="font-size:12px;color:var(--text-hint);margin-top:4px;">결석(X) → 0점</div>
+    </div>
+    <div class="divider"></div>
+    <div class="settings-section">
+      <h2>레벨 기준점</h2>
+      ${['레전드','다이아','골드','실버'].map(n=>{
+        const lv=s.levels.find(l=>l.name===n)||{minScore:0};
+        return `<div class="level-row"><label>${n}</label><input type="number" id="lv-${n}" value="${lv.minScore}" min="0"></div>`;
+      }).join('')}
+      <div class="level-row"><label>브론즈</label><input type="number" value="0" disabled style="color:var(--text-hint);"></div>
+      <button class="btn btn-primary btn-sm" style="margin-top:8px;" onclick="saveSettings()">저장</button>
+    </div>
+    <div class="divider"></div>
+    <div class="settings-section">
+      <h2>데이터 관리</h2>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <button class="btn btn-muted" onclick="exportData()">JSON으로 내보내기</button>
+        <label class="btn btn-muted" style="text-align:center;cursor:pointer;">
+          JSON 가져오기
+          <input type="file" accept=".json" style="display:none;" onchange="importData(this)">
+        </label>
+        <button class="btn btn-danger" onclick="resetData()">전체 초기화</button>
+      </div>
+    </div>
+  `;
+  c.innerHTML=html;
+}
+
+function saveSettings(){
+  const s=load(KEY.settings);
+  s.attendScore=parseInt(document.getElementById('set-attend').value)||0;
+  ['레전드','다이아','골드','실버'].forEach(n=>{
+    const lv=s.levels.find(l=>l.name===n);
+    if(lv) lv.minScore=parseInt(document.getElementById('lv-'+n).value)||0;
+  });
+  save(KEY.settings,s);
+  alert('저장되었습니다.');
+}
+
+function exportData(){
+  const data={};
+  Object.values(KEY).forEach(k=>{ data[k]=load(k); });
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='silhaengja_data_'+new Date().toISOString().slice(0,10)+'.json';
+  a.click();
+}
+
+function importData(input){
+  const file=input.files[0];
+  if(!file) return;
+  if(!confirm('현재 모든 데이터가 덮어씌워집니다. 계속할까요?')){ input.value=''; return; }
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const data=JSON.parse(e.target.result);
+      Object.values(KEY).forEach(k=>{ if(data[k]!==undefined) save(k,data[k]); });
+      alert('가져오기 완료.');
+      renderContent();
+    }catch{
+      alert('올바른 JSON 파일이 아닙니다.');
+    }
+    input.value='';
+  };
+  reader.readAsText(file);
+}
+
+function resetData(){
+  if(!confirm('정말 삭제할까요?')) return;
+  if(!confirm('되돌릴 수 없습니다. 확인하시겠습니까?')) return;
+  Object.values(KEY).forEach(k=>localStorage.removeItem(k));
+  initStorage();
+  renderContent();
+}
+
+// ─── Modal helper ─────────────────────────────────────────────
+function closeModal(id){
+  document.getElementById(id)?.remove();
+}
+
+// ─── Init ─────────────────────────────────────────────────────
+initStorage();
+renderContent();
+</script>
+</body>
+</html>
