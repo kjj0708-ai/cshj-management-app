@@ -261,28 +261,38 @@ function save(key, val){
 async function syncToSupabase(key, val){
   try {
     if(key === KEY.members){
-      await sb.from('members').delete().not('id','is',null);
+      await sb.from('members').delete().gte('id','00000000-0000-0000-0000-000000000000');
       if(val.length > 0) await sb.from('members').insert(val.map(m=>({id:m.id,name:m.name,intro:m.intro||''})));
     } else if(key === KEY.sessions){
-      await sb.from('sessions').delete().not('id','is',null);
+      await sb.from('sessions').delete().gte('id','00000000-0000-0000-0000-000000000000');
       if(val.length > 0) await sb.from('sessions').insert(val.map(s=>({id:s.id,no:s.no,date:s.date,title:s.title||''})));
     } else if(key === KEY.attendance){
-      await sb.from('attendance').delete().not('member_id','is',null);
+      // 부모 테이블(members, sessions) 먼저 upsert 후 attendance 삽입
+      const ms = store.members;
+      const ss = store.sessions;
+      if(ms.length>0) await sb.from('members').upsert(ms.map(m=>({id:m.id,name:m.name,intro:m.intro||''})));
+      if(ss.length>0) await sb.from('sessions').upsert(ss.map(s=>({id:s.id,no:s.no,date:s.date,title:s.title||''})));
+      await sb.from('attendance').delete().gte('member_id','00000000-0000-0000-0000-000000000000');
       const rows = Object.entries(val).map(([k,v])=>{
         const [member_id,session_id]=k.split('__');
         return {member_id,session_id,status:v};
       });
       if(rows.length > 0) await sb.from('attendance').insert(rows);
     } else if(key === KEY.missions){
-      await sb.from('missions').delete().not('id','is',null);
+      await sb.from('missions').delete().gte('id','00000000-0000-0000-0000-000000000000');
       if(val.length > 0) await sb.from('missions').insert(val.map(m=>({id:m.id,name:m.name,max_score:m.maxScore,category:m.category,description:m.desc||''})));
     } else if(key === KEY.missionScores){
-      await sb.from('mission_scores').delete().not('member_id','is',null);
-      const rows = Object.entries(val).map(([k,v])=>{
+      // 부모 테이블(members, missions) 먼저 upsert
+      const ms2 = store.members;
+      const mis = store.missions;
+      if(ms2.length>0) await sb.from('members').upsert(ms2.map(m=>({id:m.id,name:m.name,intro:m.intro||''})));
+      if(mis.length>0) await sb.from('missions').upsert(mis.map(m=>({id:m.id,name:m.name,max_score:m.maxScore,category:m.category,description:m.desc||''})));
+      await sb.from('mission_scores').delete().gte('member_id','00000000-0000-0000-0000-000000000000');
+      const rows2 = Object.entries(val).map(([k,v])=>{
         const [member_id,mission_id]=k.split('__');
         return {member_id,mission_id,score:Number(v)};
       });
-      if(rows.length > 0) await sb.from('mission_scores').insert(rows);
+      if(rows2.length > 0) await sb.from('mission_scores').insert(rows2);
     } else if(key === KEY.settings){
       await sb.from('app_settings').upsert({id:1,levels:val.levels,attend_score:val.attendScore,lock_pw:val.lockPw||null});
     }
@@ -1129,7 +1139,10 @@ function renderCrossTable(c, missions, members){
     const nameTd=document.createElement('td');
     nameTd.className='mission-label-cell';
     nameTd.style.cssText='text-align:left;padding:6px 8px;';
-    nameTd.innerHTML='<div style="font-weight:600;font-size:12px;">'+ms.name+'</div>'
+    nameTd.innerHTML='<div style="display:flex;align-items:center;gap:4px;">'
+      +'<span style="font-weight:600;font-size:12px;flex:1;">'+ms.name+'</span>'
+      +'<button onclick="openMissionModal(''+ms.id+'')" style="background:none;border:none;cursor:pointer;font-size:12px;color:var(--text-hint);padding:0 2px;flex-shrink:0;">✏️</button>'
+      +'</div>'
       +'<div style="font-size:10px;color:var(--text-hint);margin-top:1px;">최대 '+ms.maxScore+'</div>';
     tr.appendChild(nameTd);
 
@@ -1211,25 +1224,29 @@ function renderCrossTable(c, missions, members){
   wrap.appendChild(table);
   c.appendChild(wrap);
 }
-function openMissionModal(){
-  if(!isEditAllowed()){ requireUnlock(()=>openMissionModal()); return; }
+function openMissionModal(editId){
+  if(!isEditAllowed()){ requireUnlock(()=>openMissionModal(editId)); return; }
+  const missions=load(KEY.missions)||[];
+  const editing=editId?missions.find(m=>m.id===editId):null;
   const overlay=document.createElement('div');
   overlay.className='modal-overlay';
   overlay.id='mission-modal';
+  const cats=['AI','투자','마인드셋','기타'];
   overlay.innerHTML=`
     <div class="modal-card">
-      <div class="modal-title">미션 추가</div>
-      <div class="form-group"><label>미션명 *</label><input id="ms-name" placeholder="미션명"></div>
-      <div class="form-group"><label>최대점수 *</label><input id="ms-max" type="number" min="1" value="20"></div>
+      <div class="modal-title">${editing?'미션 편집':'미션 추가'}</div>
+      <div class="form-group"><label>미션명 *</label><input id="ms-name" placeholder="미션명" value="${editing?editing.name:''}"></div>
+      <div class="form-group"><label>최대점수 *</label><input id="ms-max" type="number" min="1" value="${editing?editing.maxScore:20}"></div>
       <div class="form-group"><label>카테고리</label>
         <select id="ms-cat">
-          <option>AI</option><option>투자</option><option>마인드셋</option><option>기타</option>
+          ${cats.map(cat=>`<option${(editing&&editing.category===cat)||(!editing&&cat==='AI')?' selected':''}>${cat}</option>`).join('')}
         </select>
       </div>
-      <div class="form-group"><label>설명 (선택)</label><input id="ms-desc" placeholder="설명"></div>
+      <div class="form-group"><label>설명 (선택)</label><input id="ms-desc" placeholder="설명" value="${editing?editing.desc||'':''}"></div>
       <div class="modal-actions">
+        ${editing?`<button class="btn btn-danger" onclick="deleteMission('${editId}')">삭제</button>`:''}
         <button class="btn btn-muted" onclick="closeModal('mission-modal')">취소</button>
-        <button class="btn btn-primary" onclick="saveMission()">추가</button>
+        <button class="btn btn-primary" onclick="saveMission('${editId||''}')">${editing?'저장':'추가'}</button>
       </div>
     </div>
   `;
@@ -1237,20 +1254,31 @@ function openMissionModal(){
   document.getElementById('ms-name').focus();
 }
 
-function saveMission(){
+function saveMission(editId){
   const name=document.getElementById('ms-name').value.trim();
   const maxScore=parseInt(document.getElementById('ms-max').value);
   if(!name){ alert('미션명을 입력해 주세요.'); return; }
   if(!maxScore||maxScore<=0){ alert('최대점수를 올바르게 입력해 주세요.'); return; }
   const missions=load(KEY.missions)||[];
-  missions.push({
-    id:uuid(),
-    name,
-    maxScore,
-    category:document.getElementById('ms-cat').value,
-    desc:document.getElementById('ms-desc').value.trim()
-  });
+  if(editId){
+    const m=missions.find(x=>x.id===editId);
+    if(m){ m.name=name; m.maxScore=maxScore; m.category=document.getElementById('ms-cat').value; m.desc=document.getElementById('ms-desc').value.trim(); }
+  } else {
+    missions.push({id:uuid(),name,maxScore,category:document.getElementById('ms-cat').value,desc:document.getElementById('ms-desc').value.trim()});
+  }
   save(KEY.missions,missions);
+  closeModal('mission-modal');
+  renderContent();
+}
+
+function deleteMission(missionId){
+  if(!confirm('미션을 삭제할까요?\n관련 점수 기록도 함께 삭제됩니다.')) return;
+  let missions=load(KEY.missions)||[];
+  missions=missions.filter(m=>m.id!==missionId);
+  save(KEY.missions,missions);
+  const ms=load(KEY.missionScores)||{};
+  Object.keys(ms).forEach(k=>{ if(k.endsWith('__'+missionId)) delete ms[k]; });
+  save(KEY.missionScores,ms);
   closeModal('mission-modal');
   renderContent();
 }
