@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>실행자들 실행실적</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
 :root {
@@ -192,6 +193,14 @@ label{font-size:13px;color:var(--text-sub);margin-bottom:4px;display:block;}
 </style>
 </head>
 <body>
+<div id="loading-overlay" style="position:fixed;inset:0;background:#0E1018;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;gap:16px;">
+  <div style="font-size:32px;">⚡</div>
+  <div style="font-size:15px;color:#EAEAF6;font-weight:600;">실행자들</div>
+  <div style="font-size:13px;color:#8A8AAE;">데이터 불러오는 중...</div>
+  <div style="width:120px;height:3px;background:#1F2438;border-radius:2px;overflow:hidden;margin-top:4px;">
+    <div id="load-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#3B6ED8,#6B9EFF);border-radius:2px;transition:width 1.5s ease;"></div>
+  </div>
+</div>
 <div id="app">
   <div id="header">
     <button id="header-back" onclick="closeDetail()">←</button>
@@ -219,30 +228,112 @@ label{font-size:13px;color:var(--text-sub);margin-bottom:4px;display:block;}
 </div>
 
 <script>
-// ─── Storage helpers ───────────────────────────────────────────
+// ─── Supabase 설정 ────────────────────────────────────────────
+const SUPABASE_URL = 'https://gqdrwlejudycikybwwmj.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdxZHJ3bGVqdWR5Y2lreWJ3d21qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUyMDc0MDcsImV4cCI6MjA5MDc4MzQwN30.0pE30PamMnqOHbNFQkU1Mk50c9GKdjSKaQ3UC9UTWGA';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
 const KEY = { members:'members', sessions:'sessions', attendance:'attendance', missions:'missions', missionScores:'missionScores', settings:'settings' };
 
-function load(key){ try{ return JSON.parse(localStorage.getItem(key)); }catch{ return null; } }
-function save(key,val){ localStorage.setItem(key,JSON.stringify(val)); }
+// ─── 인메모리 스토어 ──────────────────────────────────────────
+const store = {
+  members: [],
+  sessions: [],
+  attendance: {},
+  missions: [],
+  missionScores: {},
+  settings: {
+    levels:[{name:'레전드',minScore:500},{name:'다이아',minScore:350},{name:'골드',minScore:200},{name:'실버',minScore:100},{name:'브론즈',minScore:0}],
+    attendScore:10, lockPw:null
+  }
+};
 
-function initStorage(){
-  if(!load(KEY.members))     save(KEY.members,[]);
-  if(!load(KEY.sessions))    save(KEY.sessions,[]);
-  if(!load(KEY.attendance))  save(KEY.attendance,{});
-  if(!load(KEY.missions))    save(KEY.missions,[]);
-  if(!load(KEY.missionScores)) save(KEY.missionScores,{});
-  if(!load(KEY.settings))    save(KEY.settings,{
-    levels:[
-      {name:'레전드',minScore:500},
-      {name:'다이아',minScore:350},
-      {name:'골드',minScore:200},
-      {name:'실버',minScore:100},
-      {name:'브론즈',minScore:0}
-    ],
-    attendScore:10,
-    lockPw: null
-  });
+function load(key){
+  const v = store[key];
+  return v !== undefined ? JSON.parse(JSON.stringify(v)) : null;
 }
+
+function save(key, val){
+  store[key] = val;
+  syncToSupabase(key, val).catch(e => console.error('Supabase sync error:', key, e));
+}
+
+async function syncToSupabase(key, val){
+  try {
+    if(key === KEY.members){
+      await sb.from('members').delete().not('id','is',null);
+      if(val.length > 0) await sb.from('members').insert(val.map(m=>({id:m.id,name:m.name,intro:m.intro||''})));
+    } else if(key === KEY.sessions){
+      await sb.from('sessions').delete().not('id','is',null);
+      if(val.length > 0) await sb.from('sessions').insert(val.map(s=>({id:s.id,no:s.no,date:s.date,title:s.title||''})));
+    } else if(key === KEY.attendance){
+      await sb.from('attendance').delete().not('member_id','is',null);
+      const rows = Object.entries(val).map(([k,v])=>{
+        const [member_id,session_id]=k.split('__');
+        return {member_id,session_id,status:v};
+      });
+      if(rows.length > 0) await sb.from('attendance').insert(rows);
+    } else if(key === KEY.missions){
+      await sb.from('missions').delete().not('id','is',null);
+      if(val.length > 0) await sb.from('missions').insert(val.map(m=>({id:m.id,name:m.name,max_score:m.maxScore,category:m.category,description:m.desc||''})));
+    } else if(key === KEY.missionScores){
+      await sb.from('mission_scores').delete().not('member_id','is',null);
+      const rows = Object.entries(val).map(([k,v])=>{
+        const [member_id,mission_id]=k.split('__');
+        return {member_id,mission_id,score:Number(v)};
+      });
+      if(rows.length > 0) await sb.from('mission_scores').insert(rows);
+    } else if(key === KEY.settings){
+      await sb.from('app_settings').upsert({id:1,levels:val.levels,attend_score:val.attendScore,lock_pw:val.lockPw||null});
+    }
+  } catch(e) {
+    console.error('syncToSupabase error:', key, e);
+  }
+}
+
+async function initFromSupabase(){
+  showLoading();
+  try {
+    const [mRes,sRes,aRes,msRes,scoreRes,setRes] = await Promise.all([
+      sb.from('members').select('*'),
+      sb.from('sessions').select('*').order('no'),
+      sb.from('attendance').select('*'),
+      sb.from('missions').select('*'),
+      sb.from('mission_scores').select('*'),
+      sb.from('app_settings').select('*').eq('id',1).maybeSingle()
+    ]);
+    store.members = mRes.data || [];
+    store.sessions = sRes.data || [];
+    store.attendance = {};
+    (aRes.data||[]).forEach(a=>{ store.attendance[a.member_id+'__'+a.session_id]=a.status; });
+    store.missions = (msRes.data||[]).map(m=>({id:m.id,name:m.name,maxScore:m.max_score,category:m.category,desc:m.description||''}));
+    store.missionScores = {};
+    (scoreRes.data||[]).forEach(s=>{ if(s.score>0) store.missionScores[s.member_id+'__'+s.mission_id]=s.score; });
+    if(setRes.data){
+      store.settings={levels:setRes.data.levels,attendScore:setRes.data.attend_score,lockPw:setRes.data.lock_pw||null};
+    } else {
+      await syncToSupabase(KEY.settings, store.settings);
+    }
+  } catch(e){
+    console.error('Supabase load error:', e);
+    alert('데이터 로드 실패. 인터넷 연결을 확인하고 새로고침해 주세요.');
+  }
+  hideLoading();
+  renderContent();
+  updateLockBtn();
+}
+
+function showLoading(){
+  const el=document.getElementById('loading-overlay');
+  if(el){ el.style.display='flex'; setTimeout(()=>{ const b=document.getElementById('load-bar'); if(b) b.style.width='90%'; },100); }
+}
+function hideLoading(){
+  const b=document.getElementById('load-bar');
+  if(b) b.style.width='100%';
+  setTimeout(()=>{ const el=document.getElementById('loading-overlay'); if(el) el.style.display='none'; }, 300);
+}
+
+function initStorage(){ /* Supabase로 대체 */ }
 
 // ─── Utility ──────────────────────────────────────────────────
 function uuid(){ return crypto.randomUUID(); }
@@ -1283,9 +1374,7 @@ function closeModal(id){
 }
 
 // ─── Init ─────────────────────────────────────────────────────
-initStorage();
-renderContent();
-updateLockBtn();
+initFromSupabase();
 </script>
 </body>
 </html>
