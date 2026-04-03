@@ -1141,7 +1141,7 @@ function renderCrossTable(c, missions, members){
     nameTd.style.cssText='text-align:left;padding:6px 8px;';
     nameTd.innerHTML='<div style="display:flex;align-items:center;gap:4px;">'
       +'<span style="font-weight:600;font-size:12px;flex:1;">'+ms.name+'</span>'
-      +'<button onclick="openMissionModal(''+ms.id+'')" style="background:none;border:none;cursor:pointer;font-size:12px;color:var(--text-hint);padding:0 2px;flex-shrink:0;">✏️</button>'
+      +`<button onclick="openMissionModal('${ms.id}')" style="background:none;border:none;cursor:pointer;font-size:12px;color:var(--text-hint);padding:0 2px;flex-shrink:0;">✏️</button>`
       +'</div>'
       +'<div style="font-size:10px;color:var(--text-hint);margin-top:1px;">최대 '+ms.maxScore+'</div>';
     tr.appendChild(nameTd);
