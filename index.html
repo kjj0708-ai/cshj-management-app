@@ -1174,7 +1174,7 @@ function renderCrossTable(c, missions, members){
       inp.onfocus=function(){
         if(!isEditAllowed()){ this.blur(); requireUnlock(()=>{}); }
       };
-      inp.onchange=function(){
+      inp.oninput=function(){
         if(!isEditAllowed()){ this.value=Number((load(KEY.missionScores)||{})[this.dataset.key]||0)||''; return; }
         let v=parseInt(this.value)||0;
         if(v<0) v=0;
@@ -1186,10 +1186,19 @@ function renderCrossTable(c, missions, members){
         if(v===ms.maxScore && v>0) td.className='mission-cell-full';
         else if(v>0) td.className='mission-cell-partial';
         else { td.className='mission-cell-empty'; this.value=''; }
+        // 행 합계 업데이트
         const allScores=load(KEY.missionScores)||{};
-        let newSum=0;
-        members.forEach(m2=>{ newSum+=Number(allScores[m2.id+'__'+ms.id]||0); });
-        rowSumCell.textContent=newSum+'점';
+        let newRowSum=0;
+        members.forEach(m2=>{ newRowSum+=Number(allScores[m2.id+'__'+ms.id]||0); });
+        rowSumCell.textContent=newRowSum+'점';
+        // 열 합계(헤더) 업데이트
+        const colSumTh=document.querySelector(`.col-sum-${m.id}`);
+        if(colSumTh){
+          let colSum=0;
+          const curMissions=load(KEY.missions)||[];
+          curMissions.forEach(mis=>{ colSum+=Number(allScores[m.id+'__'+mis.id]||0); });
+          colSumTh.textContent=colSum;
+        }
       };
       td.appendChild(inp);
       tr.appendChild(td);
@@ -1213,6 +1222,7 @@ function renderCrossTable(c, missions, members){
     missions.forEach(ms=>{ sum+=Number(missionScores[m.id+'__'+ms.id]||0); });
     const th=document.createElement('th');
     th.style.cssText='font-weight:700;font-size:12px;color:var(--accent);padding:4px 2px;';
+    th.className=`col-sum-${m.id}`;
     th.textContent=sum;
     sumTr.appendChild(th);
   });
