@@ -253,9 +253,20 @@ function load(key){
   return v !== undefined ? JSON.parse(JSON.stringify(v)) : null;
 }
 
+// debounce timer for missionScores sync
+let _missionScoreTimer = null;
+
 function save(key, val){
   store[key] = val;
-  syncToSupabase(key, val).catch(e => console.error('Supabase sync error:', key, e));
+  if(key === KEY.missionScores){
+    // debounce: 500ms 후 sync (연속 입력 시 마지막 값만 전송)
+    clearTimeout(_missionScoreTimer);
+    _missionScoreTimer = setTimeout(()=>{
+      syncToSupabase(key, store[key]).catch(e => console.error('Supabase sync error:', key, e));
+    }, 500);
+  } else {
+    syncToSupabase(key, val).catch(e => console.error('Supabase sync error:', key, e));
+  }
 }
 
 async function syncToSupabase(key, val){
@@ -287,8 +298,10 @@ async function syncToSupabase(key, val){
       const mis = store.missions;
       if(ms2.length>0) await sb.from('members').upsert(ms2.map(m=>({id:m.id,name:m.name,intro:m.intro||''})));
       if(mis.length>0) await sb.from('missions').upsert(mis.map(m=>({id:m.id,name:m.name,max_score:m.maxScore,category:m.category,description:m.desc||''})));
+      // delete-then-insert 대신 전체 삭제 후 최신 store 값으로 재삽입 (snapshot 방식)
+      const snapshot = store[KEY.missionScores]; // 가장 최신 값
       await sb.from('mission_scores').delete().gte('member_id','00000000-0000-0000-0000-000000000000');
-      const rows2 = Object.entries(val).map(([k,v])=>{
+      const rows2 = Object.entries(snapshot).map(([k,v])=>{
         const [member_id,mission_id]=k.split('__');
         return {member_id,mission_id,score:Number(v)};
       });
