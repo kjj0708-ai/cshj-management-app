@@ -29,10 +29,10 @@ body{background:var(--bg-page);color:var(--text-main);font-family:-apple-system,
 #header-back{display:none;background:none;border:none;cursor:pointer;font-size:18px;margin-right:8px;color:var(--text-main);}
 
 /* Content */
-#content{flex:1;overflow-y:auto;padding-bottom:8px;}
+#content{flex:1;overflow-y:auto;padding-bottom:64px;}
 
 /* Tab bar */
-#tabbar{height:56px;background:#12162A;border-top:0.5px solid rgba(255,255,255,0.06);display:flex;flex-shrink:0;box-shadow:0 -2px 12px rgba(0,0,0,0.4);}
+#tabbar{height:56px;background:#12162A;border-top:0.5px solid rgba(255,255,255,0.06);display:flex;flex-shrink:0;box-shadow:0 -2px 12px rgba(0,0,0,0.4);position:fixed;bottom:0;left:0;right:0;max-width:480px;margin:0 auto;z-index:100;}
 .tab-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;background:none;border:none;cursor:pointer;font-size:12px;font-weight:600;color:rgba(255,255,255,0.45);padding:4px 0;transition:color .15s;}
 .tab-btn.active{color:#FFFFFF;}
 .tab-btn .tab-icon{font-size:22px;line-height:1;}
@@ -162,7 +162,7 @@ label{font-size:13px;color:var(--text-sub);margin-bottom:4px;display:block;}
 .cross-table td.mission-cell-empty{background:#161A28;color:var(--text-hint);}
 .score-input{width:36px;border:none;background:transparent;text-align:center;font-size:12px;font-weight:600;padding:6px 2px;cursor:pointer;}
 .score-input:focus{outline:2px solid var(--accent);border-radius:4px;}
-.cross-table .mission-label-cell{text-align:left;padding:6px 8px;font-weight:600;background:var(--bg-card);white-space:nowrap;}
+.cross-table .mission-label-cell{text-align:left;padding:6px 8px;font-weight:600;background:var(--bg-card);white-space:nowrap;position:sticky;left:0;z-index:2;}
 .cross-table .mission-max{color:var(--text-hint);font-weight:400;}
 .cross-table .sum-row td{background:#1A1E30;font-weight:700;padding:6px 8px;}
 
@@ -1123,7 +1123,7 @@ function renderCrossTable(c, missions, members){
   const thead=document.createElement('thead');
   const headTr=document.createElement('tr');
   const thMission=document.createElement('th');
-  thMission.style.cssText='text-align:left;min-width:100px;';
+  thMission.style.cssText='text-align:left;min-width:100px;position:sticky;left:0;z-index:3;background:#1A1E30;';
   thMission.textContent='미션';
   headTr.appendChild(thMission);
   members.forEach(m=>{
@@ -1227,7 +1227,7 @@ function renderCrossTable(c, missions, members){
   const sumTr=document.createElement('tr');
   sumTr.className='sum-row';
   const sumLabel=document.createElement('th');
-  sumLabel.style.cssText='text-align:left;padding:4px 8px;font-size:11px;color:var(--text-hint);font-weight:600;';
+  sumLabel.style.cssText='text-align:left;padding:4px 8px;font-size:11px;color:var(--text-hint);font-weight:600;position:sticky;left:0;z-index:3;background:#1A1E30;';
   sumLabel.textContent='합계';
   sumTr.appendChild(sumLabel);
   members.forEach(m=>{
