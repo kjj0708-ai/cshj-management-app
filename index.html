@@ -253,15 +253,21 @@ function load(key){
   return v !== undefined ? JSON.parse(JSON.stringify(v)) : null;
 }
 
-// debounce timer for missionScores sync
+// debounce timers
 let _missionScoreTimer = null;
+let _attendanceTimer = null;
 
 function save(key, val){
   store[key] = val;
   if(key === KEY.missionScores){
-    // debounce: 500ms 후 sync (연속 입력 시 마지막 값만 전송)
     clearTimeout(_missionScoreTimer);
     _missionScoreTimer = setTimeout(()=>{
+      syncToSupabase(key, store[key]).catch(e => console.error('Supabase sync error:', key, e));
+    }, 500);
+  } else if(key === KEY.attendance){
+    // debounce: O/X 빠르게 토글해도 마지막 상태만 전송
+    clearTimeout(_attendanceTimer);
+    _attendanceTimer = setTimeout(()=>{
       syncToSupabase(key, store[key]).catch(e => console.error('Supabase sync error:', key, e));
     }, 500);
   } else {
@@ -288,20 +294,26 @@ async function syncToSupabase(key, val){
         await sb.from('sessions').delete().gte('id','00000000-0000-0000-0000-000000000000');
       }
     } else if(key === KEY.attendance){
-      // 부모 테이블(members, sessions) 먼저 upsert 후 attendance 삽입
+      // 부모 테이블 upsert 후 최신 snapshot으로 attendance 동기화
       const ms = store.members;
       const ss = store.sessions;
       if(ms.length>0) await sb.from('members').upsert(ms.map(m=>({id:m.id,name:m.name,intro:m.intro||''})));
       if(ss.length>0) await sb.from('sessions').upsert(ss.map(s=>({id:s.id,no:s.no,date:s.date,title:s.title||''})));
+      const snapshot = store[KEY.attendance]; // 가장 최신 값
       await sb.from('attendance').delete().gte('member_id','00000000-0000-0000-0000-000000000000');
-      const rows = Object.entries(val).map(([k,v])=>{
+      const rows = Object.entries(snapshot).map(([k,v])=>{
         const [member_id,session_id]=k.split('__');
         return {member_id,session_id,status:v};
       });
       if(rows.length > 0) await sb.from('attendance').insert(rows);
     } else if(key === KEY.missions){
-      await sb.from('missions').delete().gte('id','00000000-0000-0000-0000-000000000000');
-      if(val.length > 0) await sb.from('missions').insert(val.map(m=>({id:m.id,name:m.name,max_score:m.maxScore,category:m.category,description:m.desc||''})));
+      // upsert + 제거된 미션만 삭제 (전체삭제 금지 → cascade로 mission_scores 삭제 방지)
+      if(val.length > 0){
+        await sb.from('missions').upsert(val.map(m=>({id:m.id,name:m.name,max_score:m.maxScore,category:m.category,description:m.desc||''})));
+        await sb.from('missions').delete().not('id','in',`(${val.map(m=>m.id).join(',')})`);
+      } else {
+        await sb.from('missions').delete().gte('id','00000000-0000-0000-0000-000000000000');
+      }
     } else if(key === KEY.missionScores){
       // 부모 테이블(members, missions) 먼저 upsert
       const ms2 = store.members;
