@@ -272,11 +272,21 @@ function save(key, val){
 async function syncToSupabase(key, val){
   try {
     if(key === KEY.members){
-      await sb.from('members').delete().gte('id','00000000-0000-0000-0000-000000000000');
-      if(val.length > 0) await sb.from('members').insert(val.map(m=>({id:m.id,name:m.name,intro:m.intro||''})));
+      // upsert 후 제거된 멤버만 삭제 (전체삭제 금지 → cascade로 mission_scores 삭제 방지)
+      if(val.length > 0){
+        await sb.from('members').upsert(val.map(m=>({id:m.id,name:m.name,intro:m.intro||''})));
+        await sb.from('members').delete().not('id','in',`(${val.map(m=>m.id).join(',')})`);
+      } else {
+        await sb.from('members').delete().gte('id','00000000-0000-0000-0000-000000000000');
+      }
     } else if(key === KEY.sessions){
-      await sb.from('sessions').delete().gte('id','00000000-0000-0000-0000-000000000000');
-      if(val.length > 0) await sb.from('sessions').insert(val.map(s=>({id:s.id,no:s.no,date:s.date,title:s.title||''})));
+      // 동일 방식: upsert + 제거된 세션만 삭제
+      if(val.length > 0){
+        await sb.from('sessions').upsert(val.map(s=>({id:s.id,no:s.no,date:s.date,title:s.title||''})));
+        await sb.from('sessions').delete().not('id','in',`(${val.map(s=>s.id).join(',')})`);
+      } else {
+        await sb.from('sessions').delete().gte('id','00000000-0000-0000-0000-000000000000');
+      }
     } else if(key === KEY.attendance){
       // 부모 테이블(members, sessions) 먼저 upsert 후 attendance 삽입
       const ms = store.members;
